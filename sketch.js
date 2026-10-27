@@ -1,32 +1,42 @@
+let eyeImages = [];
 let eyes = [];
+
 let holeX, holeY, holeR;
 let tiltX = 0;
 let tiltY = 0;
 let sensorText = "画面をタップして傾き操作を開始";
 
+const EYE_COUNT = 50;
+const SPEED = 0.16;
+const MAX_SPEED = 16;
+
 function preload() {
   for (let i = 1; i <= 4; i++) {
-    eyes.push(loadImage("eye0" + i + ".png"));
+    eyeImages.push(loadImage("eye0" + i + ".png"));
   }
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+
   holeX = width / 2;
   holeY = height / 2;
   holeR = min(width, height) * 0.09;
 
-  for (let i = 0; i < eyes.length; i++) {
-    let d = min(width, height) * 0.13;
-    eyes[i] = {
-      img: eyes[i],
+  eyes = [];
+
+  let d = min(width, height) * 0.105;
+
+  for (let i = 0; i < EYE_COUNT; i++) {
+    eyes.push({
+      img: random(eyeImages),
       x: random(d, width - d),
       y: random(d, height - d),
-      vx: random(-1, 1),
-      vy: random(-1, 1),
+      vx: random(-3, 3),
+      vy: random(-3, 3),
       d: d,
       gone: false
-    };
+    });
   }
 }
 
@@ -35,7 +45,7 @@ function draw() {
 
   // 中央の穴
   noStroke();
-  fill(45);
+  fill(55);
   circle(holeX, holeY, holeR * 2);
   fill(0);
   circle(holeX, holeY, holeR * 1.65);
@@ -43,28 +53,43 @@ function draw() {
   for (let e of eyes) {
     if (e.gone) continue;
 
-    e.vx += tiltX * 0.04;
-    e.vy += tiltY * 0.04;
+    // 傾きに対する反応を強くする
+    e.vx += tiltX * SPEED;
+    e.vy += tiltY * SPEED;
 
-    e.vx *= 0.99;
-    e.vy *= 0.99;
-    e.vx = constrain(e.vx, -7, 7);
-    e.vy = constrain(e.vy, -7, 7);
+    // 摩擦を少なくして速さを維持
+    e.vx *= 0.997;
+    e.vy *= 0.997;
+
+    e.vx = constrain(e.vx, -MAX_SPEED, MAX_SPEED);
+    e.vy = constrain(e.vy, -MAX_SPEED, MAX_SPEED);
 
     e.x += e.vx;
     e.y += e.vy;
 
-    if (e.x < e.d / 2 || e.x > width - e.d / 2) {
-      e.vx *= -0.8;
-      e.x = constrain(e.x, e.d / 2, width - e.d / 2);
+    // 壁で跳ね返る
+    if (e.x < e.d / 2) {
+      e.x = e.d / 2;
+      e.vx = abs(e.vx) * 0.85;
     }
 
-    if (e.y < e.d / 2 || e.y > height - e.d / 2) {
-      e.vy *= -0.8;
-      e.y = constrain(e.y, e.d / 2, height - e.d / 2);
+    if (e.x > width - e.d / 2) {
+      e.x = width - e.d / 2;
+      e.vx = -abs(e.vx) * 0.85;
     }
 
-    if (dist(e.x, e.y, holeX, holeY) < holeR) {
+    if (e.y < e.d / 2) {
+      e.y = e.d / 2;
+      e.vy = abs(e.vy) * 0.85;
+    }
+
+    if (e.y > height - e.d / 2) {
+      e.y = height - e.d / 2;
+      e.vy = -abs(e.vy) * 0.85;
+    }
+
+    // 中央の穴に入ると消える
+    if (dist(e.x, e.y, holeX, holeY) < holeR * 0.8) {
       e.gone = true;
       continue;
     }
@@ -80,21 +105,31 @@ function draw() {
 }
 
 function touchStarted() {
-  if (typeof DeviceOrientationEvent !== "undefined" &&
-      typeof DeviceOrientationEvent.requestPermission === "function") {
+  if (
+    typeof DeviceOrientationEvent !== "undefined" &&
+    typeof DeviceOrientationEvent.requestPermission === "function"
+  ) {
     DeviceOrientationEvent.requestPermission()
       .then(result => {
         if (result === "granted") {
-          window.addEventListener("deviceorientation", handleOrientation);
-          sensorText = "傾きセンサー ON";
+          window.addEventListener(
+            "deviceorientation",
+            handleOrientation
+          );
+          sensorText = "傾き操作 ON";
         } else {
           sensorText = "センサーが許可されていません";
         }
       })
-      .catch(() => sensorText = "センサーを利用できません");
+      .catch(() => {
+        sensorText = "センサーを利用できません";
+      });
   } else {
-    window.addEventListener("deviceorientation", handleOrientation);
-    sensorText = "傾きセンサーを確認中";
+    window.addEventListener(
+      "deviceorientation",
+      handleOrientation
+    );
+    sensorText = "傾き操作を確認中";
   }
 
   return false;
@@ -102,8 +137,8 @@ function touchStarted() {
 
 function handleOrientation(event) {
   if (event.gamma !== null && event.beta !== null) {
-    tiltX = constrain(event.gamma / 30, -1, 1);
-    tiltY = constrain(event.beta / 30, -1, 1);
+    tiltX = constrain(event.gamma / 20, -1, 1);
+    tiltY = constrain(event.beta / 20, -1, 1);
     sensorText = "傾き操作 ON";
   }
 }
@@ -112,4 +147,5 @@ function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   holeX = width / 2;
   holeY = height / 2;
+  holeR = min(width, height) * 0.09;
 }
